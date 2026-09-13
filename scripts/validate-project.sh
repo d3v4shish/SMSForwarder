@@ -7,6 +7,9 @@ PROJECT_ROOT=$(cd -- "$SCRIPT_DIR/.." && pwd)
 required_files=(
     README.md TODO.md BUILD.md ARCHITECTURE.md BENCHMARKS.md HOTSPOTS.md
     gradlew app/src/main/AndroidManifest.xml
+    app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+    app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+    app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png
     app/src/main/java/com/example/smsforwarder/MainActivity.kt
     app/src/main/java/com/example/smsforwarder/SmsReceiver.kt
     app/src/main/java/com/example/smsforwarder/RouteMatcher.kt
@@ -22,6 +25,8 @@ done
 grep -q 'SMS_RECEIVED' "$PROJECT_ROOT/app/src/main/AndroidManifest.xml"
 grep -q 'android.permission.RECEIVE_SMS' "$PROJECT_ROOT/app/src/main/AndroidManifest.xml"
 grep -q 'android.permission.SEND_SMS' "$PROJECT_ROOT/app/src/main/AndroidManifest.xml"
+grep -q 'android:icon="@mipmap/ic_launcher"' "$PROJECT_ROOT/app/src/main/AndroidManifest.xml"
+grep -q '@mipmap/ic_launcher_foreground' "$PROJECT_ROOT/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml"
 grep -q 'goAsync()' "$PROJECT_ROOT/app/src/main/java/com/example/smsforwarder/SmsReceiver.kt"
 grep -q 'newSingleThreadExecutor' "$PROJECT_ROOT/app/src/main/java/com/example/smsforwarder/SmsReceiver.kt"
 grep -q 'Enter a sender or message condition' "$PROJECT_ROOT/app/src/main/java/com/example/smsforwarder/MainActivity.kt"

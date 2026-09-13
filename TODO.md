@@ -16,6 +16,10 @@
   - Contract: the app uses off-white surfaces, sharp bordered controls, technical typography for phone data, and blue/green/amber/red only for their documented semantic roles.
   - Validation: XML/static validation passes; visual device/emulator review remains part of the configured-host validation below.
 
+- [x] Add an adaptive launcher icon.
+  - Contract: Android 8+ uses a transparent SMS-forwarding foreground mark over the app's off-white background; Android 6–7 receive a bitmap fallback.
+  - Validation: density-specific foreground/fallback images and adaptive XML are present; the Android debug build will validate the manifest reference.
+
 - [x] Run Android build, unit tests, and fixed-workload benchmark on a configured build host.
   - Contract: `scripts/build.sh`, `scripts/test.sh`, and `scripts/benchmark.sh` complete with JDK 17+ and Android SDK Platform 36 installed (the app continues to target SDK 35).
   - Validation: debug APK built successfully; all matcher tests passed; `scripts/benchmark.sh` measured 124 ms for its fixed workload and is recorded in `BENCHMARKS.md`.

@@ -41,6 +41,7 @@ Future work can add optional per-route forwarding history and more explicit rule
 - The first matching route wins, which prevents accidental duplicate forwards from overlapping rules.
 - The app does not abort the system SMS broadcast or alter the original message.
 - The interface uses a technical-paper visual system: neutral off-white chrome, sharp bordered surfaces, and semantic color only for interactive, healthy, pending, and destructive states. The tokens stay app-local until another app needs the same implementation.
+- The launcher icon is a blue SMS-bubble/forward-arrow mark on the same off-white surface; Android 8+ uses it as an adaptive icon and older devices use density-specific bitmap fallbacks.
 
 ## Limitations
 
