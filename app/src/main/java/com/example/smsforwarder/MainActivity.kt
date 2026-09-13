@@ -52,33 +52,25 @@ class MainActivity : Activity() {
             )
         }
 
-        container.addView(overline("LOCAL SMS ROUTING", R.color.primary))
         container.addView(heading("SMS Forwarder", 28))
-        container.addView(body("Event-driven routing for messages that need to reach another number. Rules run in the order shown."))
-        container.addView(spacer(18))
 
-        val permissionsGranted = hasSmsPermissions()
-        container.addView(
-            noticeCard(
-                if (permissionsGranted) R.color.success else R.color.warning,
-                if (permissionsGranted) "SMS ACCESS READY" else "SMS ACCESS REQUIRED",
-                if (permissionsGranted) {
-                    "Incoming SMS can be evaluated and forwarded when a route matches."
-                } else {
-                    "Grant receive and send permissions before forwarding can operate."
-                },
-            ),
-        )
-        if (!permissionsGranted) {
+        if (!hasSmsPermissions()) {
+            container.addView(
+                noticeCard(
+                    R.color.warning,
+                    "SMS PERMISSION REQUIRED",
+                    "Allow SMS access before matching messages can be forwarded.",
+                ),
+                fullWidthParams(top = 14),
+            )
             container.addView(button("Grant SMS permissions", ButtonStyle.PRIMARY) { requestSmsPermissions() }.apply {
                 layoutParams = fullWidthParams(top = 10)
             })
         }
 
-        container.addView(sectionDivider())
-        container.addView(overline("ROUTE TABLE"))
-        container.addView(heading("Forwarding rules", 20))
-        container.addView(body("Rules normally find literal text in sender and message fields. Advanced regex is available when needed. When both are present, both must match."))
+        container.addView(heading("Forwarding rules", 20).apply {
+            layoutParams = fullWidthParams(top = if (hasSmsPermissions()) 16 else 22)
+        })
 
         val routes = routeStore.load()
         if (routes.isEmpty()) {
@@ -88,13 +80,9 @@ class MainActivity : Activity() {
                 container.addView(routeCard(route, index, routes.size), fullWidthParams(top = 10))
             }
         }
-        container.addView(button("Add routing rule", ButtonStyle.PRIMARY) { showRouteEditor(null) }.apply {
+        container.addView(button("Add rule", ButtonStyle.PRIMARY) { showRouteEditor(null) }.apply {
             layoutParams = fullWidthParams(top = 12)
         })
-
-        container.addView(sectionDivider())
-        container.addView(overline("OPERATION"))
-        container.addView(body("Blue controls change configuration. Green confirms readiness. Amber requests attention. Red is reserved for destructive actions. Carrier SMS charges may apply."))
 
         setContentView(
             ScrollView(this).apply {
@@ -108,8 +96,8 @@ class MainActivity : Activity() {
     private fun emptyRoutesCard(): View {
         return card().apply {
             setPadding(dp(16), dp(14), dp(16), dp(14))
-            addView(overline("NO ROUTES CONFIGURED"))
-            addView(body("Add text included in a sender or message to create the first forwarding rule."))
+            addView(heading("No routing rules", 16))
+            addView(body("Add a rule to forward matching messages."))
         }
     }
 
@@ -137,11 +125,10 @@ class MainActivity : Activity() {
     private fun routeCard(route: Route, index: Int, routeCount: Int): View {
         return card().apply {
             setPadding(dp(16), dp(14), dp(16), dp(12))
-            addView(overline("ROUTE ${index + 1} · FIRST MATCH WINS", R.color.primary))
-            addView(heading("Forward to", 18))
+            addView(overline("ROUTE ${index + 1}", R.color.primary))
+            addView(overline("FORWARD TO"))
             addView(technicalText(route.destination, 17, color(R.color.textPrimary)))
             addView(thinDivider())
-            addView(overline(if (route.matchMode == RouteMatchMode.CONTAINS) "LITERAL CONTAINS" else "ADVANCED REGEX", R.color.primary))
             addView(routeCondition(conditionLabel("SENDER", route.matchMode), route.senderRule.ifBlank { "Any sender" }))
             addView(routeCondition(conditionLabel("MESSAGE", route.matchMode), route.messageRule.ifBlank { "Any message" }))
             addView(thinDivider())
@@ -173,10 +160,9 @@ class MainActivity : Activity() {
             setPadding(dp(20), dp(4), dp(20), 0)
         }
         var matchMode = existing?.matchMode ?: RouteMatchMode.CONTAINS
-        form.addView(overline("MATCH STYLE").apply { layoutParams = fullWidthParams(top = 10) })
         val matchStyleButtons = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            layoutParams = fullWidthParams(top = 3)
+            layoutParams = fullWidthParams(top = 10)
         }
         val containsButton = button("Contains", ButtonStyle.SECONDARY) {}
         val regexButton = button("Regex", ButtonStyle.SECONDARY) {}
@@ -217,9 +203,9 @@ class MainActivity : Activity() {
             message.label.text = if (regex) "MESSAGE REGEX" else "MESSAGE CONTAINS"
             message.input.hint = if (regex) "e.g. \\b(?:OTP|PIN)\\b" else "e.g. OTP"
             modeHelp.text = if (regex) {
-                "Case-insensitive Android regex. ^ and $ match the whole sender; \\bOTP\\b matches a word. At least one expression is required."
+                "Use ^ and $ for a whole sender; \\bOTP\\b matches a word."
             } else {
-                "Matches literal text anywhere, ignoring case. At least one condition is required."
+                "Matches text anywhere, ignoring case."
             }
         }
         containsButton.setOnClickListener {
@@ -475,18 +461,9 @@ class MainActivity : Activity() {
         setStroke(dp(borderWidth), border)
     }
 
-    private fun sectionDivider(): View = View(this).apply {
-        setBackgroundColor(color(R.color.border))
-        layoutParams = fullWidthParams(top = 22, bottom = 16, height = 1)
-    }
-
     private fun thinDivider(): View = View(this).apply {
         setBackgroundColor(color(R.color.border))
         layoutParams = fullWidthParams(top = 8, bottom = 8, height = 1)
-    }
-
-    private fun spacer(height: Int): View = View(this).apply {
-        layoutParams = LinearLayout.LayoutParams(1, dp(height))
     }
 
     private fun fullWidthParams(

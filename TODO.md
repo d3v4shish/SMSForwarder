@@ -24,6 +24,10 @@
   - Contract: new routes use case-insensitive literal sender/message contains predicates; the entire route may opt into advanced regex, and both populated predicates must match. Existing regex routes retain regex semantics after migration.
   - Validation: JVM tests cover literal metacharacters, combined conditions, regex anchors/word boundaries, wildcards, ordering, and invalid-expression safety. The fixed mixed-mode benchmark is recorded in `BENCHMARKS.md`.
 
+- [x] Reduce non-actionable route-management copy.
+  - Contract: normal operation has no status card, decorative section text, or color legend; actionable permission guidance and input help remain visible.
+  - Validation: static project validation and Android unit tests pass.
+
 - [x] Run Android build, unit tests, and fixed-workload benchmark on a configured build host.
   - Contract: `scripts/build.sh`, `scripts/test.sh`, and `scripts/benchmark.sh` complete with JDK 17+ and Android SDK Platform 36 installed (the app continues to target SDK 35).
   - Validation: debug APK built successfully; all matcher tests passed; `scripts/benchmark.sh` measured 124 ms for its fixed workload and is recorded in `BENCHMARKS.md`.
