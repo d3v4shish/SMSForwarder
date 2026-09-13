@@ -8,7 +8,7 @@ Some messages, such as alerts from a service or a particular contact, need to re
 
 ## Demo
 
-Create a route with `Sender contains: BANK`, `Message contains: OTP`, and a destination number. The next SMS matching both populated fields is forwarded to that destination.
+Create a route with `Sender contains: BANK`, `Message contains: OTP`, and a destination number. The next SMS containing both values is forwarded to that destination. Select `Regex` only when a structured rule is needed, such as `^BANK-[A-Z]+$` and `\b(?:OTP|PIN)\b`.
 
 ## What is interesting technically
 
@@ -20,7 +20,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## How it works
 
-Routes are stored locally on-device. Each route must contain a sender or message condition. A populated sender field and a populated message field must both match; an empty one is a wildcard. Routes are evaluated in display order, and the first match is forwarded. Long SMS bodies are split by Android's SMS manager when necessary.
+Routes are stored locally on-device. Each route has one match style: literal `Contains` (the default) or advanced `Regex`. A populated sender rule and a populated message rule must both match; an empty one is a wildcard. Contains rules search literal text case-insensitively, so `BANK` and `OTP` work without special syntax. Regex rules use case-insensitive Android Java patterns, so `\b(?:OTP|PIN)\b` finds either complete word and `^BANK-[A-Z]+$` constrains the entire sender. Routes are evaluated in display order, and the first match is forwarded. Long SMS bodies are split by Android's SMS manager when necessary.
 
 ## Performance / Benchmarks
 
@@ -37,7 +37,7 @@ Future work can add optional per-route forwarding history and more explicit rule
 ## Design decisions
 
 - Route configuration stays on the device in private preferences; it is not sent to a server.
-- Matching is case-insensitive substring matching to make rules understandable and deterministic.
+- New routes use case-insensitive literal `Contains` matching, keeping `+`, `.`, `*`, and other regex characters as ordinary text. A route-wide `Regex` mode is available for exact senders, word boundaries, alternatives, and other structured matching; malformed expressions are rejected before saving and do not match at runtime.
 - The first matching route wins, which prevents accidental duplicate forwards from overlapping rules.
 - The app does not abort the system SMS broadcast or alter the original message.
 - The interface uses a technical-paper visual system: neutral off-white chrome, sharp bordered surfaces, and semantic color only for interactive, healthy, pending, and destructive states. The tokens stay app-local until another app needs the same implementation.
@@ -64,4 +64,4 @@ The first version supports local, ordered sender/content routes and direct SMS f
 
 ## Missing information
 
-Tell us if the app needs multiple destinations per rule, regular expressions, forwarding history, a default-SMS-app role, or enterprise/device-owner deployment; those choices change the routing and distribution design.
+Tell us if the app needs multiple destinations per rule, forwarding history, a default-SMS-app role, or enterprise/device-owner deployment; those choices change the routing and distribution design.

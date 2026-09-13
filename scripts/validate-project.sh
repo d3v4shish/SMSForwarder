@@ -13,6 +13,7 @@ required_files=(
     app/src/main/java/com/example/smsforwarder/MainActivity.kt
     app/src/main/java/com/example/smsforwarder/SmsReceiver.kt
     app/src/main/java/com/example/smsforwarder/RouteMatcher.kt
+    app/src/main/java/com/example/smsforwarder/RouteRegex.kt
 )
 
 for file in "${required_files[@]}"; do
@@ -31,6 +32,8 @@ grep -q 'goAsync()' "$PROJECT_ROOT/app/src/main/java/com/example/smsforwarder/Sm
 grep -q 'newSingleThreadExecutor' "$PROJECT_ROOT/app/src/main/java/com/example/smsforwarder/SmsReceiver.kt"
 grep -q 'Enter a sender or message condition' "$PROJECT_ROOT/app/src/main/java/com/example/smsforwarder/MainActivity.kt"
 grep -q 'technicalText(route.destination' "$PROJECT_ROOT/app/src/main/java/com/example/smsforwarder/MainActivity.kt"
+grep -q 'RouteMatchMode.CONTAINS' "$PROJECT_ROOT/app/src/main/java/com/example/smsforwarder/RouteMatcher.kt"
+grep -q 'RouteRegex.matches' "$PROJECT_ROOT/app/src/main/java/com/example/smsforwarder/RouteMatcher.kt"
 grep -q '<color name="primary">#2563EB</color>' "$PROJECT_ROOT/app/src/main/res/values/colors.xml"
 grep -q '<color name="success">#16A34A</color>' "$PROJECT_ROOT/app/src/main/res/values/colors.xml"
 grep -q '<color name="warning">#F59E0B</color>' "$PROJECT_ROOT/app/src/main/res/values/colors.xml"

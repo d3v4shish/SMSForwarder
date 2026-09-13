@@ -1,19 +1,18 @@
 package com.example.smsforwarder
 
-import java.util.Locale
-
 object RouteMatcher {
     fun firstMatch(routes: List<Route>, sender: String, body: String): Route? {
-        val normalizedSender = sender.lowercase(Locale.ROOT)
-        val normalizedBody = body.lowercase(Locale.ROOT)
-
         return routes.firstOrNull { route ->
-            matches(route.senderContains, normalizedSender) &&
-                matches(route.messageContains, normalizedBody)
+            matches(route.matchMode, route.senderRule, sender) &&
+                matches(route.matchMode, route.messageRule, body)
         }
     }
 
-    private fun matches(condition: String, value: String): Boolean {
-        return condition.isBlank() || value.contains(condition.lowercase(Locale.ROOT))
+    private fun matches(mode: RouteMatchMode, condition: String, value: String): Boolean {
+        if (condition.isBlank()) return true
+        return when (mode) {
+            RouteMatchMode.CONTAINS -> value.contains(condition, ignoreCase = true)
+            RouteMatchMode.REGEX -> RouteRegex.matches(condition, value)
+        }
     }
 }

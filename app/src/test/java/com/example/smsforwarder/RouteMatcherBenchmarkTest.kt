@@ -9,7 +9,13 @@ class RouteMatcherBenchmarkTest {
     fun fixedRouteSelectionWorkload() {
         val routes = List(100) { index ->
             if (index == 75) {
-                Route(index.toLong(), "service", "important", "+15550000075")
+                Route(
+                    id = index.toLong(),
+                    senderRule = "^service-[a-z]+$",
+                    messageRule = "\\bimportant\\b",
+                    destination = "+15550000075",
+                    matchMode = RouteMatchMode.REGEX,
+                )
             } else {
                 Route(index.toLong(), "unmatched-$index", "", "+15550000000")
             }

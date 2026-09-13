@@ -4,7 +4,8 @@
 
 - `MainActivity` requests SMS permissions and lets the user create, edit, delete, and order routes. Its local presentation helpers apply the shared technical-paper color, border, spacing, and typography tokens without a UI-library dependency.
 - `RouteStore` persists routes as JSON in app-private `SharedPreferences`.
-- `RouteMatcher` is a pure Kotlin function that picks the first matching route.
+- `RouteMatcher` is a pure Kotlin function that picks the first matching route using either literal contains or advanced regex semantics.
+- `RouteRegex` validates and performs bounded, case-insensitive Java regular-expression searches for sender and message conditions.
 - `SmsReceiver` receives Android's `SMS_RECEIVED` broadcast, extracts message parts, and schedules forwarding on one process-local executor.
 - `SmsForwarder` uses `SmsManager` to send the matched message to its destination.
 
@@ -14,7 +15,7 @@
 
 ## Interfaces and boundaries
 
-`RouteMatcher` has no Android dependencies and is unit-tested on the JVM. Android permissions, broadcast delivery, `SharedPreferences`, and `SmsManager` are the platform/storage/network boundaries. The app holds no server connection or database.
+`RouteMatcher` and `RouteRegex` have no Android dependencies and are unit-tested on the JVM. Android permissions, broadcast delivery, `SharedPreferences`, and `SmsManager` are the platform/storage/network boundaries. The app holds no server connection or database.
 
 ## Concurrency
 
@@ -22,7 +23,7 @@ Android invokes the receiver on the main thread. It calls `goAsync()` and uses a
 
 ## Important decisions
 
-Routes are evaluated in stored order; the first match wins. Every route needs at least one predicate, and non-empty sender/body predicates are combined with AND. This prevents a mistaken catch-all from forwarding every SMS while making overlapping routes predictable.
+Routes are evaluated in stored order; the first match wins. Every route needs at least one predicate, and non-empty sender/body predicates are combined with AND. New routes default to case-insensitive literal contains matching; advanced routes use case-insensitive Java regex (`^`/`$` make a full match; `\b` selects words), limited to 256 characters. Invalid stored regex never matches. Existing `senderRegex`/`messageRegex` records load as advanced routes so an update cannot reinterpret a saved rule as literal text.
 
 ## Presentation system
 

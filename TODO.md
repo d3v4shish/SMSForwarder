@@ -1,7 +1,7 @@
 # TODO
 
 - [x] Implement ordered local SMS forwarding routes.
-  - Contract: a route has at least one sender/content substring and a required destination; the first matching route forwards the incoming body.
+  - Contract: a route has at least one sender/content condition and a required destination; the first matching route forwards the incoming body.
   - Validation: pure JVM tests cover route matching and order; static project validation passes.
 
 - [x] Implement the event-driven SMS receiver and permissions UI.
@@ -19,6 +19,10 @@
 - [x] Add an adaptive launcher icon.
   - Contract: Android 8+ uses a transparent SMS-forwarding foreground mark over the app's off-white background; Android 6–7 receive a bitmap fallback.
   - Validation: density-specific foreground/fallback images and adaptive XML are present; the Android debug build will validate the manifest reference.
+
+- [x] Add simple contains matching with advanced regular-expression routing.
+  - Contract: new routes use case-insensitive literal sender/message contains predicates; the entire route may opt into advanced regex, and both populated predicates must match. Existing regex routes retain regex semantics after migration.
+  - Validation: JVM tests cover literal metacharacters, combined conditions, regex anchors/word boundaries, wildcards, ordering, and invalid-expression safety. The fixed mixed-mode benchmark is recorded in `BENCHMARKS.md`.
 
 - [x] Run Android build, unit tests, and fixed-workload benchmark on a configured build host.
   - Contract: `scripts/build.sh`, `scripts/test.sh`, and `scripts/benchmark.sh` complete with JDK 17+ and Android SDK Platform 36 installed (the app continues to target SDK 35).

@@ -78,7 +78,7 @@ class MainActivity : Activity() {
         container.addView(sectionDivider())
         container.addView(overline("ROUTE TABLE"))
         container.addView(heading("Forwarding rules", 20))
-        container.addView(body("A route needs a sender or message condition. When both are present, both must match."))
+        container.addView(body("Rules normally find literal text in sender and message fields. Advanced regex is available when needed. When both are present, both must match."))
 
         val routes = routeStore.load()
         if (routes.isEmpty()) {
@@ -109,7 +109,7 @@ class MainActivity : Activity() {
         return card().apply {
             setPadding(dp(16), dp(14), dp(16), dp(14))
             addView(overline("NO ROUTES CONFIGURED"))
-            addView(body("Add a sender or message match to create the first forwarding rule."))
+            addView(body("Add text included in a sender or message to create the first forwarding rule."))
         }
     }
 
@@ -141,8 +141,9 @@ class MainActivity : Activity() {
             addView(heading("Forward to", 18))
             addView(technicalText(route.destination, 17, color(R.color.textPrimary)))
             addView(thinDivider())
-            addView(routeCondition("SENDER MATCH", route.senderContains.ifBlank { "Any sender" }))
-            addView(routeCondition("MESSAGE MATCH", route.messageContains.ifBlank { "Any message" }))
+            addView(overline(if (route.matchMode == RouteMatchMode.CONTAINS) "LITERAL CONTAINS" else "ADVANCED REGEX", R.color.primary))
+            addView(routeCondition(conditionLabel("SENDER", route.matchMode), route.senderRule.ifBlank { "Any sender" }))
+            addView(routeCondition(conditionLabel("MESSAGE", route.matchMode), route.messageRule.ifBlank { "Any message" }))
             addView(thinDivider())
             addView(
                 LinearLayout(this@MainActivity).apply {
@@ -171,16 +172,65 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(4), dp(20), 0)
         }
-        val sender = labeledInput(form, "SENDER MATCH", "e.g. BANK-ALERT", existing?.senderContains.orEmpty())
-        val message = labeledInput(form, "MESSAGE MATCH", "e.g. OTP or delivery", existing?.messageContains.orEmpty())
+        var matchMode = existing?.matchMode ?: RouteMatchMode.CONTAINS
+        form.addView(overline("MATCH STYLE").apply { layoutParams = fullWidthParams(top = 10) })
+        val matchStyleButtons = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = fullWidthParams(top = 3)
+        }
+        val containsButton = button("Contains", ButtonStyle.SECONDARY) {}
+        val regexButton = button("Regex", ButtonStyle.SECONDARY) {}
+        matchStyleButtons.addView(containsButton)
+        matchStyleButtons.addView(regexButton)
+        form.addView(matchStyleButtons)
+
+        val sender = labeledInput(
+            form,
+            "SENDER CONTAINS",
+            "e.g. BANK",
+            existing?.senderRule.orEmpty(),
+            technical = true,
+        )
+        val message = labeledInput(
+            form,
+            "MESSAGE CONTAINS",
+            "e.g. OTP",
+            existing?.messageRule.orEmpty(),
+            technical = true,
+        )
         val destination = labeledInput(
             form,
             "FORWARD TO",
             "+15551234567",
             existing?.destination.orEmpty(),
             technical = true,
-        ).apply { inputType = android.text.InputType.TYPE_CLASS_PHONE }
-        form.addView(caption("At least one match condition is required. Phone data uses monospace typography."))
+        ).also { it.input.inputType = android.text.InputType.TYPE_CLASS_PHONE }
+        val modeHelp = caption("")
+        form.addView(modeHelp)
+
+        fun updateMatchStyle() {
+            val regex = matchMode == RouteMatchMode.REGEX
+            styleButton(containsButton, if (regex) ButtonStyle.SECONDARY else ButtonStyle.PRIMARY)
+            styleButton(regexButton, if (regex) ButtonStyle.PRIMARY else ButtonStyle.SECONDARY)
+            sender.label.text = if (regex) "SENDER REGEX" else "SENDER CONTAINS"
+            sender.input.hint = if (regex) "e.g. ^BANK-[A-Z]+$" else "e.g. BANK"
+            message.label.text = if (regex) "MESSAGE REGEX" else "MESSAGE CONTAINS"
+            message.input.hint = if (regex) "e.g. \\b(?:OTP|PIN)\\b" else "e.g. OTP"
+            modeHelp.text = if (regex) {
+                "Case-insensitive Android regex. ^ and $ match the whole sender; \\bOTP\\b matches a word. At least one expression is required."
+            } else {
+                "Matches literal text anywhere, ignoring case. At least one condition is required."
+            }
+        }
+        containsButton.setOnClickListener {
+            matchMode = RouteMatchMode.CONTAINS
+            updateMatchStyle()
+        }
+        regexButton.setOnClickListener {
+            matchMode = RouteMatchMode.REGEX
+            updateMatchStyle()
+        }
+        updateMatchStyle()
 
         val dialog = AlertDialog.Builder(this)
             .setTitle(if (existing == null) "Add routing rule" else "Edit routing rule")
@@ -193,13 +243,23 @@ class MainActivity : Activity() {
             styleDialogButton(dialog.getButton(AlertDialog.BUTTON_NEGATIVE), ButtonStyle.NEUTRAL)
             styleDialogButton(dialog.getButton(AlertDialog.BUTTON_POSITIVE), ButtonStyle.PRIMARY)
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val senderCondition = sender.text.toString().trim()
-                val messageCondition = message.text.toString().trim()
+                val senderCondition = sender.input.text.toString().trim()
+                val messageCondition = message.input.text.toString().trim()
                 if (senderCondition.isEmpty() && messageCondition.isEmpty()) {
                     Toast.makeText(this, "Enter a sender or message condition.", Toast.LENGTH_LONG).show()
                     return@setOnClickListener
                 }
-                val normalizedDestination = normalizeDestination(destination.text.toString())
+                if (matchMode == RouteMatchMode.REGEX) {
+                    RouteRegex.validationError(senderCondition)?.let { error ->
+                        Toast.makeText(this, "Sender regex: $error", Toast.LENGTH_LONG).show()
+                        return@setOnClickListener
+                    }
+                    RouteRegex.validationError(messageCondition)?.let { error ->
+                        Toast.makeText(this, "Message regex: $error", Toast.LENGTH_LONG).show()
+                        return@setOnClickListener
+                    }
+                }
+                val normalizedDestination = normalizeDestination(destination.input.text.toString())
                 if (normalizedDestination == null) {
                     Toast.makeText(this, "Enter a valid destination number.", Toast.LENGTH_LONG).show()
                     return@setOnClickListener
@@ -207,9 +267,10 @@ class MainActivity : Activity() {
                 saveRoute(
                     Route(
                         id = existing?.id ?: nextRouteId(),
-                        senderContains = senderCondition,
-                        messageContains = messageCondition,
+                        senderRule = senderCondition,
+                        messageRule = messageCondition,
                         destination = normalizedDestination,
+                        matchMode = matchMode,
                     ),
                 )
                 dialog.dismiss()
@@ -285,9 +346,10 @@ class MainActivity : Activity() {
         hint: String,
         value: String,
         technical: Boolean = false,
-    ): EditText {
-        form.addView(overline(label).apply { layoutParams = fullWidthParams(top = 10) })
-        return EditText(this).apply {
+    ): RuleInput {
+        val labelView = overline(label).apply { layoutParams = fullWidthParams(top = 10) }
+        form.addView(labelView)
+        val input = EditText(this).apply {
             this.hint = hint
             setHintTextColor(color(R.color.textSecondary))
             setTextColor(color(R.color.textPrimary))
@@ -298,7 +360,9 @@ class MainActivity : Activity() {
             setPadding(dp(12), dp(10), dp(12), dp(10))
             background = outlinedSurface(color(R.color.background), color(R.color.border))
             layoutParams = fullWidthParams(top = 3)
-        }.also(form::addView)
+        }
+        form.addView(input)
+        return RuleInput(labelView, input)
     }
 
     private fun card(): LinearLayout = LinearLayout(this).apply {
@@ -439,6 +503,12 @@ class MainActivity : Activity() {
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private enum class ButtonStyle { PRIMARY, SECONDARY, DESTRUCTIVE, NEUTRAL }
+
+    private data class RuleInput(val label: TextView, val input: EditText)
+
+    private fun conditionLabel(subject: String, mode: RouteMatchMode): String {
+        return if (mode == RouteMatchMode.CONTAINS) "$subject CONTAINS" else "$subject REGEX"
+    }
 
     private companion object {
         const val SMS_PERMISSIONS_REQUEST = 100
