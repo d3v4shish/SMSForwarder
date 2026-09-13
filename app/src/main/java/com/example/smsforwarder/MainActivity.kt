@@ -3,10 +3,14 @@ package com.example.smsforwarder
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.os.Bundle
+import android.provider.ContactsContract
 import android.telephony.PhoneNumberUtils
 import android.view.Gravity
 import android.view.View
@@ -17,9 +21,12 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
     private val routeStore by lazy { RouteStore(applicationContext) }
+    private val contactExecutor = Executors.newSingleThreadExecutor()
+    private var contactDestinationInput: EditText? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,13 +40,51 @@ class MainActivity : Activity() {
         render()
     }
 
+    override fun onDestroy() {
+        contactExecutor.shutdown()
+        super.onDestroy()
+    }
+
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
         grantResults: IntArray,
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == SMS_PERMISSIONS_REQUEST) render()
+        when (requestCode) {
+            SMS_PERMISSIONS_REQUEST -> render()
+            CONTACTS_PERMISSION_REQUEST -> {
+                if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+                    launchContactPicker()
+                } else {
+                    contactDestinationInput = null
+                    Toast.makeText(this, "Allow Contacts access to choose a forwarding number.", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    @Deprecated("Deprecated in Android SDK")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != CONTACT_PICK_REQUEST) return
+
+        val destinationInput = contactDestinationInput
+        contactDestinationInput = null
+        if (resultCode != RESULT_OK || destinationInput == null) return
+
+        val contactUri = data?.data ?: return
+        contactExecutor.execute {
+            val number = readContactNumber(contactUri)
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (number == null) {
+                    Toast.makeText(this, "This contact has no usable phone number.", Toast.LENGTH_LONG).show()
+                } else {
+                    destinationInput.setText(number)
+                }
+            }
+        }
     }
 
     private fun render() {
@@ -191,6 +236,11 @@ class MainActivity : Activity() {
             existing?.destination.orEmpty(),
             technical = true,
         ).also { it.input.inputType = android.text.InputType.TYPE_CLASS_PHONE }
+        form.addView(button("Choose contact", ButtonStyle.SECONDARY) {
+            chooseContact(destination.input)
+        }.apply {
+            layoutParams = fullWidthParams(top = 8)
+        })
         val modeHelp = caption("")
         form.addView(modeHelp)
 
@@ -315,6 +365,43 @@ class MainActivity : Activity() {
             arrayOf(Manifest.permission.RECEIVE_SMS, Manifest.permission.SEND_SMS),
             SMS_PERMISSIONS_REQUEST,
         )
+    }
+
+    private fun chooseContact(destinationInput: EditText) {
+        contactDestinationInput = destinationInput
+        if (checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+            launchContactPicker()
+        } else {
+            requestPermissions(arrayOf(Manifest.permission.READ_CONTACTS), CONTACTS_PERMISSION_REQUEST)
+        }
+    }
+
+    private fun launchContactPicker() {
+        try {
+            startActivityForResult(
+                Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI),
+                CONTACT_PICK_REQUEST,
+            )
+        } catch (_: ActivityNotFoundException) {
+            contactDestinationInput = null
+            Toast.makeText(this, "No Contacts picker is available.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun readContactNumber(contactUri: Uri): String? {
+        return try {
+            contentResolver.query(
+                contactUri,
+                arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER),
+                null,
+                null,
+                null,
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) normalizeDestination(cursor.getString(0)) else null
+            }
+        } catch (_: SecurityException) {
+            null
+        }
     }
 
     private fun hasSmsPermissions(): Boolean {
@@ -489,5 +576,7 @@ class MainActivity : Activity() {
 
     private companion object {
         const val SMS_PERMISSIONS_REQUEST = 100
+        const val CONTACTS_PERMISSION_REQUEST = 101
+        const val CONTACT_PICK_REQUEST = 102
     }
 }

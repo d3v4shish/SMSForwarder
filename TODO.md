@@ -28,6 +28,10 @@
   - Contract: normal operation has no status card, decorative section text, or color legend; actionable permission guidance and input help remain visible.
   - Validation: static project validation and Android unit tests pass.
 
+- [x] Add contact-based destination selection.
+  - Contract: the route editor can fill a destination number from the system Contacts phone-number picker after an on-demand Contacts permission grant; no contact name is persisted.
+  - Validation: manifest/static validation and Android unit tests pass.
+
 - [x] Run Android build, unit tests, and fixed-workload benchmark on a configured build host.
   - Contract: `scripts/build.sh`, `scripts/test.sh`, and `scripts/benchmark.sh` complete with JDK 17+ and Android SDK Platform 36 installed (the app continues to target SDK 35).
   - Validation: debug APK built successfully; all matcher tests passed; `scripts/benchmark.sh` measured 124 ms for its fixed workload and is recorded in `BENCHMARKS.md`.

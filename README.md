@@ -8,7 +8,7 @@ Some messages, such as alerts from a service or a particular contact, need to re
 
 ## Demo
 
-Create a route with `Sender contains: BANK`, `Message contains: OTP`, and a destination number. The next SMS containing both values is forwarded to that destination. Select `Regex` only when a structured rule is needed, such as `^BANK-[A-Z]+$` and `\b(?:OTP|PIN)\b`.
+Create a route with `Sender contains: BANK`, `Message contains: OTP`, and a destination number. Use `Choose contact` to fill that number from the system Contacts picker, or enter it manually. The next SMS containing both values is forwarded to that destination. Select `Regex` only when a structured rule is needed, such as `^BANK-[A-Z]+$` and `\b(?:OTP|PIN)\b`.
 
 ## What is interesting technically
 
@@ -45,7 +45,7 @@ Future work can add optional per-route forwarding history and more explicit rule
 
 ## Limitations
 
-- The user must grant `RECEIVE_SMS` and `SEND_SMS` at runtime.
+- The user must grant `RECEIVE_SMS` and `SEND_SMS` at runtime. `READ_CONTACTS` is requested only when they select a destination from Contacts.
 - The app must be installed on a device that allows the required SMS permissions. Google Play restricts apps that request SMS permissions, so distribution may require default-SMS-app eligibility or another permitted use case.
 - Forwarding incurs normal carrier charges and cannot run if the device has no cellular service.
 - Routes are local to one device and are not encrypted beyond Android app-private storage.

@@ -2,7 +2,7 @@
 
 ## Components
 
-- `MainActivity` requests SMS permissions and lets the user create, edit, delete, and order routes. Its local presentation helpers apply the shared technical-paper color, border, spacing, and typography tokens without a UI-library dependency.
+- `MainActivity` requests SMS permissions and lets the user create, edit, delete, and order routes. Its destination editor can open the system phone-number Contacts picker after an on-demand Contacts permission grant. Local presentation helpers apply the shared technical-paper color, border, spacing, and typography tokens without a UI-library dependency.
 - `RouteStore` persists routes as JSON in app-private `SharedPreferences`.
 - `RouteMatcher` is a pure Kotlin function that picks the first matching route using either literal contains or advanced regex semantics.
 - `RouteRegex` validates and performs bounded, case-insensitive Java regular-expression searches for sender and message conditions.
@@ -15,7 +15,7 @@
 
 ## Interfaces and boundaries
 
-`RouteMatcher` and `RouteRegex` have no Android dependencies and are unit-tested on the JVM. Android permissions, broadcast delivery, `SharedPreferences`, and `SmsManager` are the platform/storage/network boundaries. The app holds no server connection or database.
+`RouteMatcher` and `RouteRegex` have no Android dependencies and are unit-tested on the JVM. Android permissions, the system Contacts picker, broadcast delivery, `SharedPreferences`, and `SmsManager` are the platform/storage/network boundaries. The picker supplies one selected number; contact names and the address book are not persisted. The app holds no server connection or database.
 
 ## Concurrency
 
