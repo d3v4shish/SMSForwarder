@@ -8,7 +8,7 @@ Some messages, such as alerts from a service or a particular contact, need to re
 
 ## Demo
 
-Create a route with `Sender contains: BANK`, `Message contains: OTP`, and a destination number. Use `Choose contact` to fill that number from the system Contacts picker, or enter it manually. The next SMS containing both values is forwarded to that destination. Select `Regex` only when a structured rule is needed, such as `^BANK-[A-Z]+$` and `\b(?:OTP|PIN)\b`.
+Create a route with `Sender contains: Alex` or a phone-number fragment, `Message contains: OTP,PIN`, and a destination number. A comma means either message term; `OTP+urgent` requires both terms. Use `Choose sender contact` or `Choose contact` to fill sender and destination conditions from the system Contacts picker. Select `Regex` only when a structured rule is needed, such as `^BANK-[A-Z]+$` and `\b(?:OTP|PIN)\b`.
 
 ## What is interesting technically
 
@@ -20,7 +20,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## How it works
 
-Routes are stored locally on-device. Each route has one match style: literal `Contains` (the default) or advanced `Regex`. A populated sender rule and a populated message rule must both match; an empty one is a wildcard. Contains rules search literal text case-insensitively, so `BANK` and `OTP` work without special syntax. Regex rules use case-insensitive Android Java patterns, so `\b(?:OTP|PIN)\b` finds either complete word and `^BANK-[A-Z]+$` constrains the entire sender. Routes are evaluated in display order, and the first match is forwarded. Long SMS bodies are split by Android's SMS manager when necessary.
+Routes are stored locally on-device. Each route has one match style: literal `Contains` (the default) or advanced `Regex`. A populated sender rule and a populated message rule must both match; an empty one is a wildcard. Contains sender rules search the raw sender number/address and, with Contacts access, its display name. Contains message rules search literal text case-insensitively: comma separates alternatives (`OTP,PIN`), while `+` requires all terms (`payment+received`); `+` binds before comma, so `OTP+urgent,invoice` means `(OTP AND urgent) OR invoice`. Regex rules use case-insensitive Android Java patterns, so `\b(?:OTP|PIN)\b` finds either complete word and `^BANK-[A-Z]+$` constrains the entire sender. Routes are evaluated in display order, and the first match is forwarded. Long SMS bodies are split by Android's SMS manager when necessary.
 
 ## Performance / Benchmarks
 
@@ -37,7 +37,8 @@ Future work can add optional per-route forwarding history and more explicit rule
 ## Design decisions
 
 - Route configuration stays on the device in private preferences; it is not sent to a server.
-- New routes use case-insensitive literal `Contains` matching, keeping `+`, `.`, `*`, and other regex characters as ordinary text. A route-wide `Regex` mode is available for exact senders, word boundaries, alternatives, and other structured matching; malformed expressions are rejected before saving and do not match at runtime.
+- New routes use case-insensitive literal `Contains` matching. For message rules, comma is OR and `+` is AND; other regex characters remain ordinary text. A route-wide `Regex` mode is available for exact senders, word boundaries, alternatives, and other structured matching; malformed expressions are rejected before saving and do not match at runtime. Existing contains routes preserve literal comma and `+` behavior until their owner explicitly enables message terms.
+- A sender condition can be a number/address fragment or a Contacts display name. The receiver resolves a contact name lazily only after a matching message and raw-sender miss, so it does not scan contacts for every SMS.
 - The first matching route wins, which prevents accidental duplicate forwards from overlapping rules.
 - The app does not abort the system SMS broadcast or alter the original message.
 - The interface uses a technical-paper visual system: neutral off-white chrome, sharp bordered surfaces, and semantic color only for interactive, healthy, pending, and destructive states. The tokens stay app-local until another app needs the same implementation.
@@ -45,7 +46,7 @@ Future work can add optional per-route forwarding history and more explicit rule
 
 ## Limitations
 
-- The user must grant `RECEIVE_SMS` and `SEND_SMS` at runtime. `READ_CONTACTS` is requested only when they select a destination from Contacts.
+- The user must grant `RECEIVE_SMS` and `SEND_SMS` at runtime. `READ_CONTACTS` is requested only when they select a sender or destination from Contacts; name-based sender matching is unavailable if it is later denied or revoked.
 - The app must be installed on a device that allows the required SMS permissions. Google Play restricts apps that request SMS permissions, so distribution may require default-SMS-app eligibility or another permitted use case.
 - Forwarding incurs normal carrier charges and cannot run if the device has no cellular service.
 - Routes are local to one device and are not encrypted beyond Android app-private storage.

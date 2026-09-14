@@ -24,10 +24,17 @@ class SmsReceiver : BroadcastReceiver() {
 
                 val sender = messages.first().originatingAddress.orEmpty()
                 val body = messages.joinToString(separator = "") { message -> message.messageBody.orEmpty() }
-                val route = RouteMatcher.firstMatch(RouteStore(context.applicationContext).load(), sender, body)
+                val appContext = context.applicationContext
+                val senderName by lazy { ContactNameResolver.forSender(appContext, sender) }
+                val route = RouteMatcher.firstMatch(
+                    RouteStore(appContext).load(),
+                    sender,
+                    body,
+                    senderNameProvider = { senderName },
+                )
                     ?: return@execute
 
-                SmsForwarder.forward(context.applicationContext, route.destination, body)
+                SmsForwarder.forward(appContext, route.destination, body)
             } finally {
                 pendingResult.finish()
             }

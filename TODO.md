@@ -32,6 +32,10 @@
   - Contract: the route editor can fill a destination number from the system Contacts phone-number picker after an on-demand Contacts permission grant; no contact name is persisted.
   - Validation: manifest/static validation and Android unit tests pass.
 
+- [x] Add sender-name contains matching and comma/plus message terms.
+  - Contract: a Contains sender rule matches its raw address or a lazy Contacts display-name lookup; new Contains message rules use comma OR and plus AND with AND precedence, while existing rules retain literal punctuation until upgraded.
+  - Validation: JVM tests cover sender names, lazy lookup avoidance, comma/plus semantics, precedence, malformed terms, and legacy punctuation preservation. The updated fixed matcher benchmark is recorded in `BENCHMARKS.md`.
+
 - [x] Run Android build, unit tests, and fixed-workload benchmark on a configured build host.
   - Contract: `scripts/build.sh`, `scripts/test.sh`, and `scripts/benchmark.sh` complete with JDK 17+ and Android SDK Platform 36 installed (the app continues to target SDK 35).
-  - Validation: debug APK built successfully; all matcher tests passed; `scripts/benchmark.sh` measured 124 ms for its fixed workload and is recorded in `BENCHMARKS.md`.
+  - Validation: debug APK built successfully; all matcher tests passed; the current fixed-workload result is recorded in `BENCHMARKS.md`.

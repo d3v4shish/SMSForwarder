@@ -26,7 +26,7 @@ import java.util.concurrent.Executors
 class MainActivity : Activity() {
     private val routeStore by lazy { RouteStore(applicationContext) }
     private val contactExecutor = Executors.newSingleThreadExecutor()
-    private var contactDestinationInput: EditText? = null
+    private var contactPickerTarget: ContactPickerTarget? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,8 +57,8 @@ class MainActivity : Activity() {
                 if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
                     launchContactPicker()
                 } else {
-                    contactDestinationInput = null
-                    Toast.makeText(this, "Allow Contacts access to choose a forwarding number.", Toast.LENGTH_LONG).show()
+                    contactPickerTarget = null
+                    Toast.makeText(this, "Allow Contacts access to choose a contact.", Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -69,19 +69,23 @@ class MainActivity : Activity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode != CONTACT_PICK_REQUEST) return
 
-        val destinationInput = contactDestinationInput
-        contactDestinationInput = null
-        if (resultCode != RESULT_OK || destinationInput == null) return
+        val target = contactPickerTarget
+        contactPickerTarget = null
+        if (resultCode != RESULT_OK || target == null) return
 
         val contactUri = data?.data ?: return
         contactExecutor.execute {
-            val number = readContactNumber(contactUri)
+            val contact = readContact(contactUri)
+            val selectedValue = when (target.value) {
+                ContactValue.DISPLAY_NAME -> contact?.name ?: contact?.number
+                ContactValue.NUMBER -> contact?.number
+            }
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
-                if (number == null) {
-                    Toast.makeText(this, "This contact has no usable phone number.", Toast.LENGTH_LONG).show()
+                if (selectedValue == null) {
+                    Toast.makeText(this, "This contact has no usable value.", Toast.LENGTH_LONG).show()
                 } else {
-                    destinationInput.setText(number)
+                    target.input.setText(selectedValue)
                 }
             }
         }
@@ -205,6 +209,7 @@ class MainActivity : Activity() {
             setPadding(dp(20), dp(4), dp(20), 0)
         }
         var matchMode = existing?.matchMode ?: RouteMatchMode.CONTAINS
+        var containsMessageSyntax = existing?.containsMessageSyntax ?: ContainsMessageSyntax.TERM_EXPRESSION
         val matchStyleButtons = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = fullWidthParams(top = 10)
@@ -214,21 +219,42 @@ class MainActivity : Activity() {
         matchStyleButtons.addView(containsButton)
         matchStyleButtons.addView(regexButton)
         form.addView(matchStyleButtons)
+        val modeHelp = caption("")
 
         val sender = labeledInput(
             form,
-            "SENDER CONTAINS",
-            "e.g. BANK",
+            "SENDER NUMBER OR NAME",
+            "e.g. +15551234567 or Alex",
             existing?.senderRule.orEmpty(),
             technical = true,
         )
+        val senderContactButton = button("Choose sender contact", ButtonStyle.SECONDARY) {
+            chooseContact(sender.input, ContactValue.DISPLAY_NAME)
+        }.apply {
+            layoutParams = fullWidthParams(top = 8)
+        }
+        form.addView(senderContactButton)
         val message = labeledInput(
             form,
             "MESSAGE CONTAINS",
-            "e.g. OTP",
+            "e.g. OTP, PIN or OTP+urgent",
             existing?.messageRule.orEmpty(),
             technical = true,
         )
+        lateinit var enableMessageTermsButton: Button
+        fun updateMessageTerms() {
+            val termsEnabled = containsMessageSyntax == ContainsMessageSyntax.TERM_EXPRESSION
+            message.input.hint = if (termsEnabled) "e.g. OTP, PIN or OTP+urgent" else "e.g. OTP"
+            enableMessageTermsButton.visibility = if (termsEnabled) View.GONE else View.VISIBLE
+        }
+        enableMessageTermsButton = button("Enable comma/+ terms", ButtonStyle.SECONDARY) {
+            containsMessageSyntax = ContainsMessageSyntax.TERM_EXPRESSION
+            updateMessageTerms()
+            modeHelp.text = "Sender accepts a number or contact name. Message: comma = OR; + = AND."
+        }.apply {
+            layoutParams = fullWidthParams(top = 8)
+        }
+        form.addView(enableMessageTermsButton)
         val destination = labeledInput(
             form,
             "FORWARD TO",
@@ -237,25 +263,32 @@ class MainActivity : Activity() {
             technical = true,
         ).also { it.input.inputType = android.text.InputType.TYPE_CLASS_PHONE }
         form.addView(button("Choose contact", ButtonStyle.SECONDARY) {
-            chooseContact(destination.input)
+            chooseContact(destination.input, ContactValue.NUMBER)
         }.apply {
             layoutParams = fullWidthParams(top = 8)
         })
-        val modeHelp = caption("")
         form.addView(modeHelp)
 
         fun updateMatchStyle() {
             val regex = matchMode == RouteMatchMode.REGEX
             styleButton(containsButton, if (regex) ButtonStyle.SECONDARY else ButtonStyle.PRIMARY)
             styleButton(regexButton, if (regex) ButtonStyle.PRIMARY else ButtonStyle.SECONDARY)
-            sender.label.text = if (regex) "SENDER REGEX" else "SENDER CONTAINS"
-            sender.input.hint = if (regex) "e.g. ^BANK-[A-Z]+$" else "e.g. BANK"
+            sender.label.text = if (regex) "SENDER REGEX" else "SENDER NUMBER OR NAME"
+            sender.input.hint = if (regex) "e.g. ^BANK-[A-Z]+$" else "e.g. +15551234567 or Alex"
+            senderContactButton.visibility = if (regex) View.GONE else View.VISIBLE
             message.label.text = if (regex) "MESSAGE REGEX" else "MESSAGE CONTAINS"
-            message.input.hint = if (regex) "e.g. \\b(?:OTP|PIN)\\b" else "e.g. OTP"
+            if (regex) {
+                message.input.hint = "e.g. \\b(?:OTP|PIN)\\b"
+                enableMessageTermsButton.visibility = View.GONE
+            } else {
+                updateMessageTerms()
+            }
             modeHelp.text = if (regex) {
                 "Use ^ and $ for a whole sender; \\bOTP\\b matches a word."
+            } else if (containsMessageSyntax == ContainsMessageSyntax.LEGACY_LITERAL) {
+                "Sender accepts a number or contact name. Message matches literal text."
             } else {
-                "Matches text anywhere, ignoring case."
+                "Sender accepts a number or contact name. Message: comma = OR; + = AND."
             }
         }
         containsButton.setOnClickListener {
@@ -294,6 +327,11 @@ class MainActivity : Activity() {
                         Toast.makeText(this, "Message regex: $error", Toast.LENGTH_LONG).show()
                         return@setOnClickListener
                     }
+                } else if (containsMessageSyntax == ContainsMessageSyntax.TERM_EXPRESSION) {
+                    ContainsMessageTerms.validationError(messageCondition)?.let { error ->
+                        Toast.makeText(this, error, Toast.LENGTH_LONG).show()
+                        return@setOnClickListener
+                    }
                 }
                 val normalizedDestination = normalizeDestination(destination.input.text.toString())
                 if (normalizedDestination == null) {
@@ -307,6 +345,7 @@ class MainActivity : Activity() {
                         messageRule = messageCondition,
                         destination = normalizedDestination,
                         matchMode = matchMode,
+                        containsMessageSyntax = containsMessageSyntax,
                     ),
                 )
                 dialog.dismiss()
@@ -367,8 +406,8 @@ class MainActivity : Activity() {
         )
     }
 
-    private fun chooseContact(destinationInput: EditText) {
-        contactDestinationInput = destinationInput
+    private fun chooseContact(input: EditText, value: ContactValue) {
+        contactPickerTarget = ContactPickerTarget(input, value)
         if (checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
             launchContactPicker()
         } else {
@@ -383,21 +422,31 @@ class MainActivity : Activity() {
                 CONTACT_PICK_REQUEST,
             )
         } catch (_: ActivityNotFoundException) {
-            contactDestinationInput = null
+            contactPickerTarget = null
             Toast.makeText(this, "No Contacts picker is available.", Toast.LENGTH_LONG).show()
         }
     }
 
-    private fun readContactNumber(contactUri: Uri): String? {
+    private fun readContact(contactUri: Uri): Contact? {
         return try {
             contentResolver.query(
                 contactUri,
-                arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER),
+                arrayOf(
+                    ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                    ContactsContract.CommonDataKinds.Phone.NUMBER,
+                ),
                 null,
                 null,
                 null,
             )?.use { cursor ->
-                if (cursor.moveToFirst()) normalizeDestination(cursor.getString(0)) else null
+                if (cursor.moveToFirst()) {
+                    Contact(
+                        name = cursor.getString(0)?.trim()?.takeIf(String::isNotEmpty),
+                        number = cursor.getString(1)?.let(::normalizeDestination),
+                    )
+                } else {
+                    null
+                }
             }
         } catch (_: SecurityException) {
             null
@@ -569,6 +618,12 @@ class MainActivity : Activity() {
     private enum class ButtonStyle { PRIMARY, SECONDARY, DESTRUCTIVE, NEUTRAL }
 
     private data class RuleInput(val label: TextView, val input: EditText)
+
+    private data class Contact(val name: String?, val number: String?)
+
+    private data class ContactPickerTarget(val input: EditText, val value: ContactValue)
+
+    private enum class ContactValue { DISPLAY_NAME, NUMBER }
 
     private fun conditionLabel(subject: String, mode: RouteMatchMode): String {
         return if (mode == RouteMatchMode.CONTAINS) "$subject CONTAINS" else "$subject REGEX"

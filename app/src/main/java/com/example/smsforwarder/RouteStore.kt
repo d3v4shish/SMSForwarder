@@ -24,6 +24,7 @@ class RouteStore(context: Context) {
                                 messageRule = messageRule(route),
                                 destination = destination,
                                 matchMode = matchMode(route),
+                                containsMessageSyntax = containsMessageSyntax(route),
                             ),
                         )
                     }
@@ -43,7 +44,8 @@ class RouteStore(context: Context) {
                     .put(SENDER_RULE_KEY, route.senderRule.trim())
                     .put(MESSAGE_RULE_KEY, route.messageRule.trim())
                     .put(DESTINATION_KEY, route.destination.trim())
-                    .put(MATCH_MODE_KEY, route.matchMode.storageValue),
+                    .put(MATCH_MODE_KEY, route.matchMode.storageValue)
+                    .put(CONTAINS_MESSAGE_SYNTAX_KEY, route.containsMessageSyntax.storageValue),
             )
         }
         preferences.edit().putString(ROUTES_KEY, serialized.toString()).apply()
@@ -70,6 +72,14 @@ class RouteStore(context: Context) {
         }
     }
 
+    private fun containsMessageSyntax(route: JSONObject): ContainsMessageSyntax {
+        return if (route.has(CONTAINS_MESSAGE_SYNTAX_KEY)) {
+            ContainsMessageSyntax.fromStorage(route.optString(CONTAINS_MESSAGE_SYNTAX_KEY))
+        } else {
+            ContainsMessageSyntax.LEGACY_LITERAL
+        }
+    }
+
     companion object {
         private const val PREFERENCES_NAME = "forwarding_routes"
         private const val ROUTES_KEY = "routes"
@@ -77,6 +87,7 @@ class RouteStore(context: Context) {
         private const val SENDER_RULE_KEY = "senderRule"
         private const val MESSAGE_RULE_KEY = "messageRule"
         private const val MATCH_MODE_KEY = "matchMode"
+        private const val CONTAINS_MESSAGE_SYNTAX_KEY = "containsMessageSyntax"
         private const val SENDER_REGEX_KEY = "senderRegex"
         private const val MESSAGE_REGEX_KEY = "messageRegex"
         private const val LEGACY_SENDER_KEY = "senderContains"

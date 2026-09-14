@@ -11,10 +11,9 @@ class RouteMatcherBenchmarkTest {
             if (index == 75) {
                 Route(
                     id = index.toLong(),
-                    senderRule = "^service-[a-z]+$",
-                    messageRule = "\\bimportant\\b",
+                    senderRule = "service",
+                    messageRule = "important+update,critical",
                     destination = "+15550000075",
-                    matchMode = RouteMatchMode.REGEX,
                 )
             } else {
                 Route(index.toLong(), "unmatched-$index", "", "+15550000000")
